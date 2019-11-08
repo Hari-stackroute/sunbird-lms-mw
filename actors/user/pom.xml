@@ -59,7 +59,7 @@
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.7.5.201505241946</version>
+				<version>0.8.4</version>
 				<configuration>
 					<destFile>${basedir}/target/coverage-reports/jacoco-unit.exec</destFile>
 					<dataFile>${basedir}/target/coverage-reports/jacoco-unit.exec</dataFile>
@@ -80,6 +80,33 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<!-- Copy the ant tasks jar. Needed for ts.jacoco.report-ant . -->
+					<execution>
+						<id>jacoco-dependency-ant</id>
+						<goals>
+							<goal>copy</goal>
+						</goals>
+						<phase>process-test-resources</phase>
+						<inherited>false</inherited>
+						<configuration>
+							<artifactItems>
+								<artifactItem>
+									<groupId>org.jacoco</groupId>
+									<artifactId>org.jacoco.ant</artifactId>
+									<version>0.8.4</version>
+								</artifactItem>
+							</artifactItems>
+							<stripVersion>true</stripVersion>
+							<outputDirectory>${basedir}/target/jacoco-jars</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

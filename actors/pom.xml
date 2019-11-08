@@ -23,4 +23,96 @@
 		<module>location</module>
 		<module>systemsettings</module>
 	</modules>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>report-aggregate</id>
+						<phase>package</phase>
+						<goals>
+							<goal>report-aggregate</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<!--<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.4</version>
+				<executions>
+					<execution>
+						<id>report-aggregate</id>
+						<phase>prepare-package</phase>
+						<goals>
+							<goal>report-aggregate</goal>
+						</goals>
+						<configuration>
+							<title>JaCoCo</title>
+							<footer>Code Coverage Report for JaCoCo</footer>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>-->
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.6</version>
+				<inherited>false</inherited>
+				<executions>
+					<execution>
+						<phase>post-integration-test</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<!-- Execute an ant task within maven -->
+								<echo message="Generating JaCoCo Reports" />
+								<taskdef name="report" classname="org.jacoco.ant.ReportTask">
+									<classpath path="${basedir}/target/jacoco-jars/org.jacoco.ant.jar" />
+								</taskdef>
+								<mkdir dir="${basedir}/target/coverage-report" />
+								<report>
+									<executiondata>
+										<fileset dir="${basedir}/user/target">
+											<include name="jacoco.exec" />
+										</fileset>
+										<!--<fileset dir="${basedir}/common/target">
+											<include name="jacoco.exec" />
+										</fileset>-->
+									</executiondata>
+									<structure name="jacoco-multi Coverage Project">
+										<group name="jacoco-multi">
+											<classfiles>
+												<fileset dir="${basedir}/user/target/classes" />
+												<!--<fileset dir="${basedir}/common/target/classes" />-->
+											</classfiles>
+											<sourcefiles encoding="UTF-8">
+												<fileset dir="${basedir}/user/src/main/java" />
+												<!--<fileset dir="${basedir}/common/src/main/java"></fileset>-->
+											</sourcefiles>
+										</group>
+									</structure>
+									<html destdir="${basedir}/target/coverage-report/html" />
+									<xml destfile="${basedir}/target/coverage-report/coverage-report.xml" />
+									<csv destfile="${basedir}/target/coverage-report/coverage-report.csv" />
+								</report>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+				<dependencies>
+					<dependency>
+						<groupId>org.jacoco</groupId>
+						<artifactId>org.jacoco.ant</artifactId>
+						<version>0.8.4</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+		</plugins>
+	</build>
 </project>
