@@ -52,27 +52,24 @@ public class EmailServiceActor extends BaseActor {
       org.sunbird.common.models.util.datasecurity.impl.ServiceFactory.getEncryptionServiceInstance(
           null);
   private ElasticSearchService esService = EsClientFactory.getInstance(JsonKey.REST);
-  private static final String NOTIFICATION_MODE = "sms";
+  private static final String NOTIFICATION_MODE_SMS = "sms";
+  private static final String NOTIFICATION_MODE_EMAIL = "email";
 
   @Override
   public void onReceive(Request request) throws Throwable {
     if (request.getOperation().equalsIgnoreCase(BackgroundOperations.emailService.name())) {
-      sendMail(request);
+      sendNotification(request);
     } else {
       onReceiveUnsupportedOperation(request.getOperation());
     }
   }
 
   @SuppressWarnings({"unchecked"})
-  private void sendMail(Request actorMessage) {
+  private void sendNotification(Request actorMessage) {
     Map<String, Object> request =
         (Map<String, Object>) actorMessage.getRequest().get(JsonKey.EMAIL_REQUEST);
-    List<String> emails = (List<String>) request.get(JsonKey.RECIPIENT_EMAILS);
-    if (CollectionUtils.isNotEmpty(emails)) {
-      checkEmailValidity(emails);
-    } else {
-      emails = new ArrayList<>();
-    }
+
+    List<String> mode = (List<String>) request.get(JsonKey.MODE);
 
     List<String> userIds = (List<String>) request.get(JsonKey.RECIPIENT_USERIDS);
     if (CollectionUtils.isEmpty(userIds)) {
@@ -80,69 +77,13 @@ public class EmailServiceActor extends BaseActor {
     }
 
     if (request.get(JsonKey.MODE) != null
-        && NOTIFICATION_MODE.equalsIgnoreCase((String) request.get(JsonKey.MODE))) {
+        && mode.contains(NOTIFICATION_MODE_SMS)) {
       List<String> phones = (List<String>) request.get(JsonKey.RECIPIENT_PHONES);
-      if (CollectionUtils.isNotEmpty(phones)) {
-        Iterator<String> itr = phones.iterator();
-        while (itr.hasNext()) {
-          String phone = itr.next();
-          if (!ProjectUtil.validatePhone(phone, "")) {
-            ProjectLogger.log(
-                "EmailServiceActor:sendMail: Removing invalid phone number =" + phone,
-                LoggerEnum.INFO.name());
-            itr.remove();
-          }
-        }
-      }
       sendSMS(phones, userIds, (String) request.get(JsonKey.BODY));
-      return;
     }
-
-    // Fetch public user emails from Elastic Search based on recipient search query given in
-    // request.
-    getUserEmailsFromSearchQuery(request, emails, userIds);
-
-    validateUserIds(userIds, emails);
-    validateRecipientsLimit(emails);
-
-    Map<String, Object> user = null;
-    if (CollectionUtils.isNotEmpty(emails)) {
-      user = getUserInfo(emails.get(0));
-    }
-
-    String name = "";
-    if (emails.size() == 1) {
-      name = StringUtils.capitalize((String) user.get(JsonKey.FIRST_NAME));
-      if (StringUtils.isBlank(name) && (String) request.get(JsonKey.FIRST_NAME) != null) {
-        name = StringUtils.capitalize((String) request.get(JsonKey.FIRST_NAME));
-      }
-    }
-
-    // fetch orgname inorder to set in the Template context
-    String orgName = getOrgName(request, (String) user.get(JsonKey.USER_ID));
-
-    request.put(JsonKey.NAME, name);
-    if (orgName != null) {
-      request.put(JsonKey.ORG_NAME, orgName);
-    }
-
-    String template = getEmailTemplateFile((String) request.get(JsonKey.EMAIL_TEMPLATE_TYPE));
-
-    Response res = new Response();
-    res.put(JsonKey.RESPONSE, JsonKey.SUCCESS);
-    sender().tell(res, self());
-    ProjectLogger.log(
-        "EmailServiceActor:sendMail: Sending email to = " + emails.size() + " emails",
-        LoggerEnum.INFO.name());
-    try {
-      SendMail.sendMailWithBody(
-          emails.toArray(new String[emails.size()]),
-          (String) request.get(JsonKey.SUBJECT),
-          ProjectUtil.getContext(request),
-          template);
-    } catch (Exception e) {
-      ProjectLogger.log(
-          "EmailServiceActor:sendMail: Exception occurred with message = " + e.getMessage(), e);
+    if (request.get(JsonKey.MODE) != null
+            && mode.contains(NOTIFICATION_MODE_EMAIL)) {
+     sendEmail(request, userIds);
     }
   }
 
@@ -157,7 +98,19 @@ public class EmailServiceActor extends BaseActor {
     ProjectLogger.log(
         "EmailServiceActor:sendSMS: method started  = " + smsText, LoggerEnum.INFO.name());
     if (CollectionUtils.isEmpty(phones)) {
-      phones = new ArrayList<String>();
+     phones = new ArrayList<String>();
+    }
+    if (CollectionUtils.isNotEmpty(phones)) {
+     Iterator<String> itr = phones.iterator();
+     while (itr.hasNext()) {
+      String phone = itr.next();
+      if (!ProjectUtil.validatePhone(phone, "")) {
+       ProjectLogger.log(
+               "EmailServiceActor:sendNotification: Removing invalid phone number =" + phone,
+               LoggerEnum.INFO.name());
+       itr.remove();
+      }
+     }
     }
     if (CollectionUtils.isNotEmpty(userIds)) {
       List<Map<String, Object>> userList = getUsersFromDB(userIds);
@@ -186,10 +139,67 @@ public class EmailServiceActor extends BaseActor {
     try {
       ISmsProvider smsProvider = SMSFactory.getInstance("91SMS");
       smsProvider.send(phones, smsText);
+      //send notification request to notification service
+      
     } catch (Exception e) {
       ProjectLogger.log(
           "EmailServiceActor:sendSMS: Exception occurred with message = " + e.getMessage(), e);
     }
+  }
+
+  void sendEmail(Map<String, Object> request, List<String> userIds) {
+   List<String> emails = (List<String>) request.get(JsonKey.RECIPIENT_EMAILS);
+   if (CollectionUtils.isNotEmpty(emails)) {
+    checkEmailValidity(emails);
+   } else {
+    emails = new ArrayList<>();
+   }
+   // Fetch public user emails from Elastic Search based on recipient search query given in
+   // request.
+   getUserEmailsFromSearchQuery(request, emails, userIds);
+
+   validateUserIds(userIds, emails);
+   validateRecipientsLimit(emails);
+
+   Map<String, Object> user = null;
+   if (CollectionUtils.isNotEmpty(emails)) {
+    user = getUserInfo(emails.get(0));
+   }
+
+   String name = "";
+   if (emails.size() == 1) {
+    name = StringUtils.capitalize((String) user.get(JsonKey.FIRST_NAME));
+    if (StringUtils.isBlank(name) && (String) request.get(JsonKey.FIRST_NAME) != null) {
+     name = StringUtils.capitalize((String) request.get(JsonKey.FIRST_NAME));
+    }
+   }
+
+   // fetch orgname inorder to set in the Template context
+   String orgName = getOrgName(request, (String) user.get(JsonKey.USER_ID));
+
+   request.put(JsonKey.NAME, name);
+   if (orgName != null) {
+    request.put(JsonKey.ORG_NAME, orgName);
+   }
+
+   String template = getEmailTemplateFile((String) request.get(JsonKey.EMAIL_TEMPLATE_TYPE));
+
+   Response res = new Response();
+   res.put(JsonKey.RESPONSE, JsonKey.SUCCESS);
+   sender().tell(res, self());
+   ProjectLogger.log(
+           "EmailServiceActor:sendNotification: Sending email to = " + emails.size() + " emails",
+           LoggerEnum.INFO.name());
+   try {
+    SendMail.sendMailWithBody(
+            emails.toArray(new String[emails.size()]),
+            (String) request.get(JsonKey.SUBJECT),
+            ProjectUtil.getContext(request),
+            template);
+   } catch (Exception e) {
+    ProjectLogger.log(
+            "EmailServiceActor:sendNotification: Exception occurred with message = " + e.getMessage(), e);
+   }
   }
 
   private void validateRecipientsLimit(List<String> recipients) {
@@ -341,7 +351,7 @@ public class EmailServiceActor extends BaseActor {
                   emails.add(email);
                 } else {
                   ProjectLogger.log(
-                      "EmailServiceActor:sendMail: Email decryption failed for userId = "
+                      "EmailServiceActor:sendNotification: Email decryption failed for userId = "
                           + user.get(JsonKey.USER_ID));
                 }
               } else {
