@@ -481,6 +481,9 @@ public class TenantMigrationActor extends BaseActor {
           deleteUserFeed(feedId);
         }
         response = modifyAttemptCount(response, shadowUserList, extUserId);
+        ProjectLogger.log(
+            "TenantMigrationActor: processShadowUserMigrate: error msg is: " + response,
+            LoggerEnum.INFO.name());
       } else {
         ProjectLogger.log(
             "TenantMigrationActor: processShadowUserMigrate: user entered valid externalId ",
