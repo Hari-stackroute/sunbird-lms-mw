@@ -511,6 +511,12 @@ public class TenantMigrationActor extends BaseActor {
       ProjectCommonException.throwClientErrorException(ResponseCode.userMigrationFiled);
     }
     response = prepareFailureResponse(extUserId, remainingAttempt);
+    ProjectLogger.log(
+        "TenantMigrationActor: modifyAttemptCount: error response details : remaining attempts: "
+            + response.get(JsonKey.REMAINING_ATTEMPT)
+            + "error msg : "
+            + response.get(JsonKey.MAX_ATTEMPT),
+        LoggerEnum.INFO.name());
     increaseBulkAttemptCount(shadowUserList, false);
     return response;
   }
